@@ -3,6 +3,32 @@ from random import randint as rand
 import music
 
 
+def melody(notes, wait=False):
+    base = ['D4', '']
+    aigu = ['A', '', 'D', '', 'B', '']
+    grave = ['A', '', 'D', '', 'G', '']
+    descente = ['C5', '', 'A4', '', 'F', '']
+
+    pause = [''] * 4
+
+    musics: dict = {
+        'pause_on': [''] * 1 + ['A4:1', 'F3'],
+        'pause_off': ['F3:1', 'A4'] + pause,
+        'lose': pause + ['B4:2', 'B4', 'A4', 'F3:4'],
+        'play': ['D4:2', 'D', 'F', 'A5:1', 'G5:2'] + pause,
+        'background': (base*3 + aigu + base*2 + grave)*2 + base*2 + descente
+    }
+
+    cycle = False
+
+    if notes == 'background':
+        cycle = True
+
+    music.set_tempo(bpm=240)
+    music.play(musics[notes], wait=wait, loop=cycle)
+
+
+
 # Fonction pour générer un mur avec un seul trou
 def generate_layer() -> list[int]:
     clear: int = rand(0, 4)
@@ -19,13 +45,7 @@ def draw_grid(grid: list[list[int]], brightness: int = 9) -> None:
 def draw(drawing: str, brightness: int = 9) -> None:
     draws: dict = {
         'play': [[0, 1, 0, 0, 0], [0, 1, 1, 0, 0], [0, 1, 1, 1, 0], [0, 1, 1, 0, 0], [0, 1, 0, 0, 0]],
-        'pause': [
-            [0, 0, 0, 0, 0],
-            [0, 1, 0, 1, 0],
-            [0, 1, 0, 1, 0],
-            [0, 1, 0, 1, 0],
-            [0, 0, 0, 0, 0]
-        ],
+        'pause': [[0, 0, 0, 0, 0], [0, 1, 0, 1, 0], [0, 1, 0, 1, 0], [0, 1, 0, 1, 0], [0, 0, 0, 0, 0]],
         'x': [[1, 0, 0, 0, 1], [0, 1, 0, 1, 0], [0, 0, 1, 0, 0], [0, 1, 0, 1, 0], [1, 0, 0, 0, 1]]
     }
 
@@ -65,10 +85,10 @@ def handle_movement(player: int) -> int:
     elif b_pressed:
         player += 1
 
-    while player > 4:
-        player -= 5
-    while player < 0:
-        player += 5
+    if player == 5:
+        player = 0
+    elif player == -1:
+        player = 4
 
     return player
 
@@ -84,7 +104,9 @@ def check_death(grid: list[list[int]], player: int) -> int:
 
 
 # Lancer le jeu
-def main() -> None:
+def main_runner() -> None:
+    melody('play', wait=True)
+    melody('background')
     # grille par défaut
     grid: list[list[int]] = [
         [0, 0, 0, 0, 0],
@@ -105,19 +127,18 @@ def main() -> None:
     while True:
         # gérer contrôles
         old_player: int = player
-        player = handle_movement(player)
+        movement = handle_movement(player)
 
-        if player == -1:
-            player = old_player
-
+        if movement == -1:
             if playing:
-                song: list[str] = ['A4:1', 'F3']
-                music.play(song)
+                melody('pause_on')
                 playing = False
             else:
-                song: list[str] = ['F3:1', 'A4']
-                music.play(song)
+                melody('pause_off', wait=True)
+                melody('background')
                 playing = True
+        elif playing:
+            player = movement
 
         # gestion du temps
         if playing:
@@ -151,23 +172,40 @@ def main() -> None:
     draw('x')
 
     # jouer le son de défaite
-    lose_sound: list[str] = ['B4:2', 'B4', 'A4', 'F3:4']
-    music.play(lose_sound)
+    melody('lose')
 
     sleep(1000)
 
     display.clear()
-    display.scroll(str(score))
+    if score < 10:
+        display.show(str(score))
+        sleep(1000)
+    else:
+        display.scroll(str(score))
 
     button_a.was_pressed()
     button_b.was_pressed()
 
 
+def main(game: int) -> None:
+    if game == 0:
+        main_runner()
+
+
 draw('play')
+game = 0
 
 while True:
     sleep(100)
 
-    if button_a.was_pressed() or button_b.was_pressed():
-        main()
+    a_pressed: bool = button_a.was_pressed()
+    b_pressed: bool = button_b.was_pressed()
+
+    if a_pressed and b_pressed:
+        main(game)
         draw('play')
+
+    if a_pressed and not b_pressed:
+        game -= 1
+    elif b_pressed and not a_pressed:
+        game += 1
